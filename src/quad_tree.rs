@@ -1,5 +1,6 @@
+use std::cmp;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub struct Point {
     x: u32,
     y: u32
@@ -66,6 +67,16 @@ pub struct Image<'a> {
     height: u32
 }
 
+impl Image<'_> {
+    fn get_val(&self, pt: &Point) -> Option<i32> {
+        if pt.x >= self.width || pt.y >= self.height {
+            return None;
+        }
+
+        Some(self.data[point_to_index(pt, self.width)])
+    }
+}
+
 fn point_to_index(point: &Point, width: u32) -> usize {
     assert!(point.x < width); // 0 indexed
     ((width * point.y) + point.x) as usize
@@ -78,13 +89,12 @@ impl TreeNode {
 
         if width <= 2 && height <= 2 {
             let mut values: Vec<i32> = Vec::new();
-            const CANDIDATES: [(u32, u32); 4] = [(0,0), (0, 1), (1, 0), (1,1)];
+            let offsets: [(u32, u32); 4] = [(0,0), (0, 1), (1, 0), (1,1)];
 
-            for (x,y) in &CANDIDATES {
+            for (x,y) in &offsets {
                 let point = &origin + Point {x: *x, y: *y};
-                if point.x < img.width && point.y < img.height {
-                    values.push(img.data[point_to_index(&point, img.width)])
-                } 
+
+                img.get_val(&point).map(|val| values.push(val));
             }
 
             return TreeNode {
@@ -100,7 +110,6 @@ impl TreeNode {
             }
         }
         
-        let mut top_left: Option<Box<TreeNode>> = None;
         let mut top_right: Option<Box<TreeNode>> = None;
         let mut bottom_left: Option<Box<TreeNode>> = None;
         let mut bottom_right: Option<Box<TreeNode>> = None;
@@ -113,9 +122,9 @@ impl TreeNode {
         let bottom_height = height - next_height;
 
         let top_left_tree = TreeNode::create(img, origin.clone(), next_width, next_height);
-        min = if min < top_left_tree.lower_bound {min} else {top_left_tree.lower_bound};
-        max = if max > top_left_tree.upper_bound {max} else {top_left_tree.upper_bound};
-        top_left = Some(Box::new(top_left_tree));
+        min = cmp::min(min, top_left_tree.lower_bound);
+        max = cmp::max(max, top_left_tree.upper_bound);
+        let top_left = Some(Box::new(top_left_tree));
 
         if width > 2 {
             let mid_x = origin.x + next_width;
@@ -279,9 +288,16 @@ mod tests {
         let img = Image {data: &data, width: 8, height: 4};
         let tree = TreeNode::create(&img, Point {x: 0, y: 0}, 8, 4);
 
-        let cells = tree.under_threshold(2);
+        let mut cells = tree.under_threshold(2);
         assert_eq!(cells.len(), 3);
 
-        assert_eq!(tree.under_threshold(3).len(), 5);
+        cells = tree.under_threshold(3);
+
+        assert_eq!(cells.len(), 5);
+        assert_eq!(cells[0], Point {x: 0, y: 0});
+        assert_eq!(cells[1], Point {x: 4, y: 0});
+        assert_eq!(cells[2], Point {x: 6, y: 0});
+        assert_eq!(cells[3], Point {x: 0, y: 2});
+        assert_eq!(cells[4], Point {x: 2, y: 2});
     }
 }
