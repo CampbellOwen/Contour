@@ -1,10 +1,10 @@
 use wasm_bindgen::prelude::*;
+mod marching_squares;
 mod quad_tree;
+mod util;
 
 #[wasm_bindgen]
-pub fn test(name: &str) {
-    println!("Hello, {}!", name);
-}
+pub fn isoline() {}
 
 #[cfg(test)]
 mod tests {
