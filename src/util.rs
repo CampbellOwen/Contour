@@ -1,3 +1,4 @@
+use std::hash::{Hash, Hasher};
 use std::iter::FromIterator;
 use std::ops::Add;
 
@@ -85,6 +86,29 @@ impl<T> FromIterator<T> for Point<T> {
         }
     }
 }
+
+impl Hash for Point<f32> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        let x_real = self.x.floor() as i32;
+        let x_fractional = (10000.0 * self.x.fract()).round() as i32;
+        let y_real = self.y.floor() as i32;
+        let y_fractional = (10000.0 * self.y.fract()).round() as i32;
+
+        x_real.hash(state);
+        x_fractional.hash(state);
+        y_real.hash(state);
+        y_fractional.hash(state);
+    }
+}
+impl Hash for Point<u32> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.x.hash(state);
+        self.y.hash(state);
+    }
+}
+
+impl Eq for Point<u32> {}
+impl Eq for Point<f32> {}
 
 pub struct Image<'a> {
     data: &'a [i32],

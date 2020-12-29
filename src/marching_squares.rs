@@ -1,15 +1,27 @@
 use super::quad_tree::*;
 use super::util::*;
 use num::{Integer, NumCast};
+use std::collections::HashMap;
+use std::hash::Hash;
 
 pub struct Path {
     points: Vec<Point<f32>>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, PartialOrd)]
+enum Direction {
+    Up,
+    Down,
+    Left,
+    Right,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, PartialOrd)]
 struct Segment {
     start: Point<f32>,
     end: Point<f32>,
+    cell_coord: Point<u32>,
+    direction: Direction,
 }
 
 enum CellIndex {
@@ -134,12 +146,16 @@ impl MarchingSquares<'_> {
             0b1110 => vec![Segment {
                 start: right(),
                 end: bottom(),
+                cell_coord: *cell,
+                direction: Direction::Down,
             }],
             // o - o
             // o - x
             0b0001 => vec![Segment {
                 start: bottom(),
                 end: right(),
+                cell_coord: *cell,
+                direction: Direction::Right,
             }],
 
             // o - o
@@ -147,12 +163,16 @@ impl MarchingSquares<'_> {
             0b0010 => vec![Segment {
                 start: left(),
                 end: bottom(),
+                cell_coord: *cell,
+                direction: Direction::Down,
             }],
             // x - x
             // o - x
             0b1101 => vec![Segment {
                 start: bottom(),
                 end: left(),
+                cell_coord: *cell,
+                direction: Direction::Left,
             }],
 
             // o - o
@@ -160,12 +180,16 @@ impl MarchingSquares<'_> {
             0b0011 => vec![Segment {
                 start: left(),
                 end: right(),
+                cell_coord: *cell,
+                direction: Direction::Down,
             }],
             // x - x
             // o - o
             0b1100 => vec![Segment {
                 start: right(),
                 end: left(),
+                cell_coord: *cell,
+                direction: Direction::Right,
             }],
 
             // o - x
@@ -173,12 +197,16 @@ impl MarchingSquares<'_> {
             0b0100 => vec![Segment {
                 start: right(),
                 end: top(),
+                cell_coord: *cell,
+                direction: Direction::Up,
             }],
             // x - o
             // x - x
             0b1011 => vec![Segment {
                 start: top(),
                 end: right(),
+                cell_coord: *cell,
+                direction: Direction::Right,
             }],
 
             // o - x
@@ -186,12 +214,16 @@ impl MarchingSquares<'_> {
             0b0101 => vec![Segment {
                 start: bottom(),
                 end: top(),
+                cell_coord: *cell,
+                direction: Direction::Up,
             }],
             // x - o
             // x - o
             0b1010 => vec![Segment {
                 start: top(),
                 end: bottom(),
+                cell_coord: *cell,
+                direction: Direction::Down,
             }],
 
             // o - x
@@ -199,12 +231,16 @@ impl MarchingSquares<'_> {
             0b0111 => vec![Segment {
                 start: left(),
                 end: top(),
+                cell_coord: *cell,
+                direction: Direction::Up,
             }],
             // x - o
             // o - o
             0b1000 => vec![Segment {
                 start: top(),
                 end: left(),
+                cell_coord: *cell,
+                direction: Direction::Left,
             }],
 
             // o - x
@@ -220,10 +256,14 @@ impl MarchingSquares<'_> {
                         Segment {
                             start: left(),
                             end: top(),
+                            cell_coord: *cell,
+                            direction: Direction::Up,
                         },
                         Segment {
                             start: right(),
                             end: bottom(),
+                            cell_coord: *cell,
+                            direction: Direction::Down,
                         },
                     ]
                 } else {
@@ -234,10 +274,14 @@ impl MarchingSquares<'_> {
                         Segment {
                             start: right(),
                             end: top(),
+                            cell_coord: *cell,
+                            direction: Direction::Up,
                         },
                         Segment {
                             start: left(),
                             end: bottom(),
+                            cell_coord: *cell,
+                            direction: Direction::Down,
                         },
                     ]
                 }
@@ -255,10 +299,14 @@ impl MarchingSquares<'_> {
                         Segment {
                             start: top(),
                             end: right(),
+                            cell_coord: *cell,
+                            direction: Direction::Right,
                         },
                         Segment {
                             start: bottom(),
                             end: left(),
+                            cell_coord: *cell,
+                            direction: Direction::Left,
                         },
                     ]
                 } else {
@@ -269,69 +317,96 @@ impl MarchingSquares<'_> {
                         Segment {
                             start: bottom(),
                             end: right(),
+                            cell_coord: *cell,
+                            direction: Direction::Right,
                         },
                         Segment {
                             start: top(),
                             end: left(),
+                            cell_coord: *cell,
+                            direction: Direction::Left,
                         },
                     ]
                 }
             }
 
-            // 0b1111 => vec![
-            //     Segment {
-            //         start: cells[CellIndex::TopLeft as usize]
-            //             .into_iter()
-            //             .map(|x| x as f32)
-            //             .collect(),
-            //         end: cells[CellIndex::TopRight as usize]
-            //             .into_iter()
-            //             .map(|x| x as f32)
-            //             .collect(),
-            //     },
-            //     Segment {
-            //         start: cells[CellIndex::TopRight as usize]
-            //             .into_iter()
-            //             .map(|x| x as f32)
-            //             .collect(),
-            //         end: cells[CellIndex::BottomRight as usize]
-            //             .into_iter()
-            //             .map(|x| x as f32)
-            //             .collect(),
-            //     },
-            //     Segment {
-            //         start: cells[CellIndex::BottomRight as usize]
-            //             .into_iter()
-            //             .map(|x| x as f32)
-            //             .collect(),
-            //         end: cells[CellIndex::BottomLeft as usize]
-            //             .into_iter()
-            //             .map(|x| x as f32)
-            //             .collect(),
-            //     },
-            //     Segment {
-            //         start: cells[CellIndex::BottomLeft as usize]
-            //             .into_iter()
-            //             .map(|x| x as f32)
-            //             .collect(),
-            //         end: cells[CellIndex::TopLeft as usize]
-            //             .into_iter()
-            //             .map(|x| x as f32)
-            //             .collect(),
-            //     },
-            // ],
             0b1111 | 0b0000 => Vec::new(),
             _ => panic!("Not a valid cell state"),
         }
     }
 
-    fn segments_for_threshold(&self, threshold: i32) -> Vec<Segment> {
+    fn segments_for_threshold(&self, threshold: i32) -> HashMap<Point<u32>, Vec<Segment>> {
+        let mut segment_map: HashMap<Point<u32>, Vec<Segment>> = HashMap::new();
         let cells = self.quad_tree.above_threshold(threshold);
-        cells
+        for cell in cells
             .iter()
             .map(|cell| self.cell_to_segments(cell, threshold))
-            .flatten()
-            .collect()
+        {
+            if let Some(segment) = cell.get(0) {
+                segment_map.insert(segment.cell_coord, cell);
+            }
+        }
+
+        segment_map
+    }
+
+    fn get_next_segment<'a>(
+        cell_segments: &'a HashMap<Point<u32>, Vec<Segment>>,
+        segment: &Segment,
+    ) -> Option<&'a Segment> {
+        let cell_diff: Point<i32> = match segment.direction {
+            Direction::Up => Point { x: 0, y: -1 },
+            Direction::Down => Point { x: 0, y: 1 },
+            Direction::Left => Point { x: -1, y: 0 },
+            Direction::Right => Point { x: 1, y: 0 },
+        };
+
+        let next_cell_coord: Point<u32> = Point {
+            x: (segment.cell_coord.x as i32 + cell_diff.x) as u32,
+            y: (segment.cell_coord.y as i32 + cell_diff.y) as u32,
+        };
+
+        if let Some(next_segments) = cell_segments.get(&next_cell_coord) {
+            for seg in next_segments {
+                if segment.end == seg.start {
+                    return Some(seg);
+                }
+            }
+        }
+
+        None
+    }
+
+    fn trace_segments(cell_segments: &HashMap<Point<u32>, Vec<Segment>>) -> Vec<Path> {
+        let mut paths = Vec::new();
+        let mut visited_segments: HashMap<Segment, bool> = HashMap::new();
+
+        for (cell_coord, segments) in cell_segments {
+            for segment in segments {
+                if visited_segments.contains_key(&segment) {
+                    continue;
+                }
+                let mut curr_path: Vec<Point<f32>> = vec![segment.start, segment.end];
+                visited_segments.insert(*segment, true);
+                let mut curr_seg = MarchingSquares::get_next_segment(cell_segments, segment);
+                while let Some(next_segment) = curr_seg {
+                    if visited_segments.contains_key(next_segment) {
+                        paths.push(Path { points: curr_path });
+                        curr_path = Vec::new();
+                        curr_seg = None;
+                    } else {
+                        curr_path.push(next_segment.end);
+                        curr_seg = MarchingSquares::get_next_segment(cell_segments, segment);
+                    }
+                }
+
+                if curr_path.len() > 0 {
+                    paths.push(Path { points: curr_path });
+                }
+            }
+        }
+
+        paths
     }
 }
 
@@ -445,7 +520,6 @@ mod tests {
     #[test]
     #[rustfmt::skip]
     fn test_cell_to_segments() {
-
         let data = [
             1, 2, 5, 6, 2, 2, 2, 2, 
             3, 4, 7, 8, 2, 2, 2, 2, 
@@ -455,9 +529,33 @@ mod tests {
         let img = Image::new(&data, 8, 4);
         let marching_squares = MarchingSquares::new(&img);
 
-        assert_eq!(marching_squares.cell_to_segments(&Point {x: 0, y: 0}, 2), vec!(Segment {start: Point {x: 0.0, y: 0.5}, end: Point {x: 1.0, y: 0.0}}));
-        assert_eq!(marching_squares.cell_to_segments(&Point {x: 0, y: 0}, 3), vec!(Segment {start: Point {x: 0.0, y: 1.0}, end: Point {x: 1.0, y: 0.5}}));
-        assert_eq!(marching_squares.cell_to_segments(&Point {x: 0, y: 0}, 4), vec!(Segment {start: Point {x: 1.0, y: 1.0}, end: Point {x: 1.0, y: 1.0}}));
+        assert_eq!(
+            marching_squares.cell_to_segments(&Point { x: 0, y: 0 }, 2),
+            vec!(Segment {
+                start: Point { x: 0.0, y: 0.5 },
+                end: Point { x: 1.0, y: 0.0 },
+                cell_coord: Point { x: 0, y: 0 },
+                direction: Direction::Up
+            })
+        );
+        assert_eq!(
+            marching_squares.cell_to_segments(&Point { x: 0, y: 0 }, 3),
+            vec!(Segment {
+                start: Point { x: 0.0, y: 1.0 },
+                end: Point { x: 1.0, y: 0.5 },
+                cell_coord: Point { x: 0, y: 0 },
+                direction: Direction::Down
+            })
+        );
+        assert_eq!(
+            marching_squares.cell_to_segments(&Point { x: 0, y: 0 }, 4),
+            vec!(Segment {
+                start: Point { x: 1.0, y: 1.0 },
+                end: Point { x: 1.0, y: 1.0 },
+                cell_coord: Point { x: 0, y: 0 },
+                direction: Direction::Right
+            })
+        );
     }
 
     #[test]
@@ -477,8 +575,28 @@ mod tests {
 
         let segments = marching_squares.segments_for_threshold(7);
 
-        for segment in segments {
+        for segment in &segments {
             println!("{:?}", segment);
         }
+        assert_eq!(segments.len(), 8);
+    }
+
+    #[test]
+    fn test_next_segment() {
+        let data = [
+            1, 2, 3, 4, 4, 3, 2, 1, 2, 3, 4, 5, 5, 4, 3, 2, 3, 4, 5, 6, 6, 5, 4, 3, 4, 5, 6, 8, 8,
+            6, 5, 4, 4, 5, 6, 8, 8, 6, 5, 4, 3, 4, 5, 6, 6, 5, 4, 3, 2, 3, 4, 5, 5, 4, 3, 2, 1, 2,
+            3, 4, 4, 3, 2, 1,
+        ];
+        let img = Image::new(&data, 8, 8);
+        let marching_squares = MarchingSquares::new(&img);
+
+        let segments = marching_squares.segments_for_threshold(7);
+        let segment = &segments[&Point { x: 2, y: 2 }][0];
+
+        assert_eq!(
+            MarchingSquares::get_next_segment(&segments, segment),
+            Some(&segments[&Point { x: 3, y: 2 }][0])
+        );
     }
 }
