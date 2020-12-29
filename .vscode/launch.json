@@ -8,7 +8,7 @@
             "type": "lldb",
             "request": "launch",
             "name": "Debug",
-            "program": "${workspaceFolder}/target/debug/deps/contour-588f600ecf69db23.exe",
+            "program": "${workspaceFolder}/target/debug/deps/contour-5c3fe5517ad984d3.exe",
             "args": [],
             "cwd": "${workspaceFolder}"
         }
