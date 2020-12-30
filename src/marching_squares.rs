@@ -1,11 +1,13 @@
 use super::quad_tree::*;
 use super::util::*;
 use num::{Integer, NumCast};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
 
+#[derive(Clone, Debug, Eq, Hash, PartialEq, PartialOrd)]
 pub struct Path {
-    points: Vec<Point<f32>>,
+    pub points: Vec<Point<f32>>,
+    pub circular: bool,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, PartialOrd)]
@@ -14,6 +16,12 @@ enum Direction {
     Down,
     Left,
     Right,
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq, PartialOrd)]
+pub struct IsolineLayer {
+    pub threshold: i32,
+    pub paths: Vec<Path>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, PartialOrd)]
@@ -38,7 +46,7 @@ const CELL_OFFSETS: [Point<u32>; 4] = [
     Point { x: 1, y: 1 },
 ];
 
-struct MarchingSquares<'a> {
+pub struct MarchingSquares<'a> {
     img: &'a Image<'a>,
     quad_tree: TreeNode,
 }
@@ -181,7 +189,7 @@ impl MarchingSquares<'_> {
                 start: left(),
                 end: right(),
                 cell_coord: *cell,
-                direction: Direction::Down,
+                direction: Direction::Right,
             }],
             // x - x
             // o - o
@@ -189,7 +197,7 @@ impl MarchingSquares<'_> {
                 start: right(),
                 end: left(),
                 cell_coord: *cell,
-                direction: Direction::Right,
+                direction: Direction::Left,
             }],
 
             // o - x
@@ -350,64 +358,106 @@ impl MarchingSquares<'_> {
         segment_map
     }
 
-    fn get_next_segment<'a>(
-        cell_segments: &'a HashMap<Point<u32>, Vec<Segment>>,
-        segment: &Segment,
-    ) -> Option<&'a Segment> {
-        let cell_diff: Point<i32> = match segment.direction {
-            Direction::Up => Point { x: 0, y: -1 },
-            Direction::Down => Point { x: 0, y: 1 },
-            Direction::Left => Point { x: -1, y: 0 },
-            Direction::Right => Point { x: 1, y: 0 },
-        };
+    pub fn isoline(&self, threshold: i32) -> IsolineLayer {
+        let cell_segments = self.segments_for_threshold(threshold);
+        let paths = trace_segments(&cell_segments);
+        IsolineLayer { threshold, paths }
+    }
+}
 
-        let next_cell_coord: Point<u32> = Point {
-            x: (segment.cell_coord.x as i32 + cell_diff.x) as u32,
-            y: (segment.cell_coord.y as i32 + cell_diff.y) as u32,
-        };
+#[derive(Debug, PartialEq)]
+enum NextSegmentError {
+    SegmentMismatch,
+    OffImage,
+}
 
-        if let Some(next_segments) = cell_segments.get(&next_cell_coord) {
-            for seg in next_segments {
-                if segment.end == seg.start {
-                    return Some(seg);
-                }
+fn get_next_segment<'a>(
+    cell_segments: &'a HashMap<Point<u32>, Vec<Segment>>,
+    segment: &Segment,
+) -> Result<&'a Segment, NextSegmentError> {
+    let cell_diff: Point<i32> = match segment.direction {
+        Direction::Up => Point { x: 0, y: -1 },
+        Direction::Down => Point { x: 0, y: 1 },
+        Direction::Left => Point { x: -1, y: 0 },
+        Direction::Right => Point { x: 1, y: 0 },
+    };
+
+    let next_cell_coord: Point<u32> = Point {
+        x: (segment.cell_coord.x as i32 + cell_diff.x) as u32,
+        y: (segment.cell_coord.y as i32 + cell_diff.y) as u32,
+    };
+
+    if let Some(next_segments) = cell_segments.get(&next_cell_coord) {
+        for seg in next_segments {
+            if segment.end == seg.start {
+                return Ok(seg);
             }
         }
-
-        None
+    } else {
+        return Err(NextSegmentError::OffImage);
     }
 
-    fn trace_segments(cell_segments: &HashMap<Point<u32>, Vec<Segment>>) -> Vec<Path> {
-        let mut paths = Vec::new();
-        let mut visited_segments: HashMap<Segment, bool> = HashMap::new();
+    Err(NextSegmentError::SegmentMismatch)
+}
 
-        for (cell_coord, segments) in cell_segments {
-            for segment in segments {
-                if visited_segments.contains_key(&segment) {
-                    continue;
-                }
-                let mut curr_path: Vec<Point<f32>> = vec![segment.start, segment.end];
-                visited_segments.insert(*segment, true);
-                let mut curr_seg = MarchingSquares::get_next_segment(cell_segments, segment);
-                while let Some(next_segment) = curr_seg {
-                    if visited_segments.contains_key(next_segment) {
-                        paths.push(Path { points: curr_path });
-                        curr_path = Vec::new();
-                        curr_seg = None;
-                    } else {
-                        curr_path.push(next_segment.end);
-                        curr_seg = MarchingSquares::get_next_segment(cell_segments, segment);
+fn trace_path<'a>(
+    cell_segments: &'a HashMap<Point<u32>, Vec<Segment>>,
+    visited_segments: &mut HashSet<Segment>,
+    start_segment: &'a Segment,
+) -> Path {
+    let mut path_points = vec![start_segment.start.clone(), start_segment.end.clone()];
+
+    let mut curr_segment = start_segment.clone();
+    visited_segments.insert(curr_segment.clone());
+
+    let mut path_circular = false;
+
+    loop {
+        match get_next_segment(cell_segments, &curr_segment) {
+            Ok(next_segment) => {
+                if visited_segments.contains(next_segment) {
+                    path_points.push(next_segment.start.clone());
+                    path_points.push(next_segment.end.clone());
+
+                    if next_segment == start_segment {
+                        path_circular = true;
                     }
+                    break;
                 }
 
-                if curr_path.len() > 0 {
-                    paths.push(Path { points: curr_path });
-                }
+                visited_segments.insert(next_segment.clone());
+                path_points.push(next_segment.end.clone());
+                curr_segment = next_segment.clone();
+            }
+            Err(NextSegmentError::OffImage) => {
+                break;
+            }
+            _ => {
+                break;
             }
         }
-
-        paths
     }
+
+    Path {
+        points: path_points,
+        circular: path_circular,
+    }
+}
+
+fn trace_segments(cell_segments: &HashMap<Point<u32>, Vec<Segment>>) -> Vec<Path> {
+    let mut paths = Vec::new();
+    let mut visited_segments: HashSet<Segment> = HashSet::new();
+
+    for (_, segments) in cell_segments {
+        for segment in segments {
+            if visited_segments.contains(&segment) {
+                continue;
+            }
+            paths.push(trace_path(&cell_segments, &mut visited_segments, segment))
+        }
+    }
+
+    paths
 }
 
 fn interpolate<T: Integer + NumCast + Copy>(t: f32, left: T, right: T) -> f32 {
@@ -544,7 +594,7 @@ mod tests {
                 start: Point { x: 0.0, y: 1.0 },
                 end: Point { x: 1.0, y: 0.5 },
                 cell_coord: Point { x: 0, y: 0 },
-                direction: Direction::Down
+                direction: Direction::Right
             })
         );
         assert_eq!(
@@ -594,9 +644,132 @@ mod tests {
         let segments = marching_squares.segments_for_threshold(7);
         let segment = &segments[&Point { x: 2, y: 2 }][0];
 
+        let expected: Result<&Segment, NextSegmentError> = Ok(&segments[&Point { x: 3, y: 2 }][0]);
         assert_eq!(
-            MarchingSquares::get_next_segment(&segments, segment),
-            Some(&segments[&Point { x: 3, y: 2 }][0])
+            get_next_segment(&segments, segment),
+            expected
         );
+
+        let segment = &segments[&Point { x: 3, y: 2 }][0];
+        let expected: Result<&Segment, NextSegmentError> = Ok(&segments[&Point { x: 4, y: 2 }][0]);
+        assert_eq!(
+            get_next_segment(&segments, segment),
+            expected
+        );
+
+        let segment = &segments[&Point { x: 4, y: 2 }][0];
+        let expected: Result<&Segment, NextSegmentError> = Ok(&segments[&Point { x: 4, y: 3 }][0]);
+        assert_eq!(
+            get_next_segment(&segments, segment),
+            expected
+        );
+
+        let segment = &segments[&Point { x: 4, y: 3 }][0];
+        let expected: Result<&Segment, NextSegmentError> = Ok(&segments[&Point { x: 4, y: 4 }][0]);
+        assert_eq!(
+            get_next_segment(&segments, segment),
+            expected
+        );
+
+        let segment = &segments[&Point { x: 4, y: 4 }][0];
+        let expected: Result<&Segment, NextSegmentError> = Ok(&segments[&Point { x: 3, y: 4 }][0]);
+        assert_eq!(
+            get_next_segment(&segments, segment),
+            expected
+        );
+
+        let segment = &segments[&Point { x: 3, y: 4 }][0];
+        let expected: Result<&Segment, NextSegmentError> = Ok(&segments[&Point { x: 2, y: 4 }][0]);
+        assert_eq!(
+            get_next_segment(&segments, segment),
+            expected
+        );
+
+        let segment = &segments[&Point { x: 2, y: 4 }][0];
+        let expected: Result<&Segment, NextSegmentError> = Ok(&segments[&Point { x: 2, y: 3 }][0]);
+        assert_eq!(
+            get_next_segment(&segments, segment),
+            expected
+        );
+
+        let segment = &segments[&Point { x: 2, y: 3 }][0];
+        let expected: Result<&Segment, NextSegmentError> = Ok(&segments[&Point { x: 2, y: 2 }][0]);
+        assert_eq!(
+            get_next_segment(&segments, segment),
+            expected
+        );
+    }
+
+    #[test]
+    #[rustfmt::skip]
+    fn test_trace_path() {
+        let data = [
+            1, 2, 3, 4, 4, 3, 2, 1, 
+            2, 3, 4, 5, 5, 4, 3, 2, 
+            3, 4, 5, 6, 6, 5, 4, 3, 
+            4, 5, 6, 8, 8, 6, 5, 4, 
+            4, 5, 6, 8, 8, 6, 5, 4, 
+            3, 4, 5, 6, 6, 5, 4, 3, 
+            2, 3, 4, 5, 5, 4, 3, 2, 
+            1, 2, 3, 4, 4, 3, 2, 1,
+        ];
+        let img = Image::new(&data, 8, 8);
+        let marching_squares = MarchingSquares::new(&img);
+
+        let segments = marching_squares.segments_for_threshold(7);
+
+        assert_eq!(
+            trace_path(&segments, &mut HashSet::new(), &segments[&Point { x: 2, y: 2 }][0]),
+            Path { points: vec![
+                Point { x: 2.5, y: 3.0 },
+                Point { x: 3.0, y: 2.5 },
+                Point { x: 4.0, y: 2.5 },
+                Point { x: 4.5, y: 3.0 },
+                Point { x: 4.5, y: 4.0 },
+                Point { x: 4.0, y: 4.5 },
+                Point { x: 3.0, y: 4.5 },
+                Point { x: 2.5, y: 4.0 },
+                Point { x: 2.5, y: 3.0 },
+            ],
+            circular: true
+         }
+        );
+    }
+
+    #[test]
+    #[rustfmt::skip]
+    fn test_trace_segments() {
+        let data = [
+            1, 2, 3, 4, 4, 3, 2, 1, 
+            2, 3, 4, 5, 5, 4, 3, 2, 
+            3, 4, 5, 6, 6, 5, 4, 3, 
+            4, 5, 6, 8, 8, 6, 5, 4, 
+            4, 5, 6, 8, 8, 6, 5, 4, 
+            3, 4, 5, 6, 6, 5, 4, 3, 
+            2, 3, 4, 5, 5, 4, 3, 2, 
+            1, 2, 3, 4, 4, 3, 2, 1,
+        ];
+        let img = Image::new(&data, 8, 8);
+        let marching_squares = MarchingSquares::new(&img);
+
+        let segments = marching_squares.segments_for_threshold(7);
+        let paths = trace_segments(&segments);
+        assert_eq!(paths.len(), 1);
+        let path = &paths[0];
+        assert_eq!(path.points.len(), 9);
+
+        for point in vec![
+            Point { x: 2.5, y: 3.0 },
+            Point { x: 3.0, y: 2.5 },
+            Point { x: 4.0, y: 2.5 },
+            Point { x: 4.5, y: 3.0 },
+            Point { x: 4.5, y: 4.0 },
+            Point { x: 4.0, y: 4.5 },
+            Point { x: 3.0, y: 4.5 },
+            Point { x: 2.5, y: 4.0 },
+            Point { x: 2.5, y: 3.0 },
+        ] {
+            assert!(path.points.contains(&point));
+        }
     }
 }
