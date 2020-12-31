@@ -1,6 +1,6 @@
 [package]
 name = "contour"
-version = "0.1.0"
+version = "0.4.0"
 authors = ["Owen Campbell <ocampbell95@gmail.com>"]
 edition = "2018"
 
@@ -10,6 +10,8 @@ edition = "2018"
 crate-type = ["cdylib"]
 
 [dependencies]
-wasm-bindgen = "0.2.69"
+wasm-bindgen = { version = "0.2.69", features = ["serde-serialize"] }
 num = "0.3.1"
 js-sys = "0.3.46"
+console_error_panic_hook = "0.1.6"
+serde = { version = "1.0.118", features = ["derive"] }

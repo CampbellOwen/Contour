@@ -5,19 +5,29 @@ mod util;
 
 use std::fmt;
 
-use js_sys::Array;
+use serde::{Deserialize, Serialize};
 
-use marching_squares::{IsolineLayer, MarchingSquares, Path};
+use marching_squares::{MarchingSquares, Path};
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SvgPath {
+    pub class: String,
+    pub path: String,
+    pub fill: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Svg {
+    pub view_box: String,
+    pub paths: Vec<SvgPath>,
+}
 
 #[cfg(target_arch = "wasm32")]
 #[wasm_bindgen]
-pub fn isoline(data: &[i32], width: u32, height: u32, thresholds: &[i32]) -> Svg {
+pub fn isoline(data: &[i32], width: u32, height: u32, thresholds: &[i32]) -> JsValue {
+    console_error_panic_hook::set_once();
     let svg = isoline_to_svg(data, width, height, thresholds);
-
-    Svg_Wasm {
-        view_box: svg.view_box,
-        paths: svg.paths.into_iter().map(JsValue::from).collect::<Array>(),
-    }
+    JsValue::from_serde(&svg).unwrap()
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -53,21 +63,6 @@ fn isoline_to_svg(data: &[i32], width: u32, height: u32, thresholds: &[i32]) -> 
     }
 }
 
-#[wasm_bindgen]
-#[derive(Clone, Debug)]
-pub struct SvgPath {
-    class: String,
-    path: String,
-    fill: String,
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-#[derive(Clone, Debug)]
-pub struct Svg {
-    view_box: String,
-    paths: Vec<SvgPath>,
-}
-
 impl fmt::Display for Svg {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut lines = vec![format!(
@@ -87,14 +82,6 @@ impl fmt::Display for Svg {
     }
 }
 
-#[cfg(target_arch = "wasm32")]
-#[wasm_bindgen]
-#[derive(Clone, Debug)]
-pub struct Svg {
-    view_box: String,
-    paths: Array,
-}
-
 pub fn path_to_svg_path(path: &Path) -> Vec<String> {
     let mut svg_path = vec![format!("M{},{}", &path.points[0].x, &path.points[0].y)];
 
@@ -111,6 +98,7 @@ pub fn path_to_svg_path(path: &Path) -> Vec<String> {
 #[cfg(test)]
 mod tests {
 
+    use super::marching_squares::IsolineLayer;
     use super::*;
 
     #[test]
