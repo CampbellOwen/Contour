@@ -1,10 +1,9 @@
 use super::util::*;
-use std::cmp;
 
 pub struct TreeNode {
     origin: Point<u32>,
-    lower_bound: i32,
-    upper_bound: i32,
+    lower_bound: f32,
+    upper_bound: f32,
     width: u32,
     height: u32,
 
@@ -15,11 +14,11 @@ pub struct TreeNode {
 }
 
 impl TreeNode {
-    pub fn create(img: &Image) -> TreeNode {
+    pub fn create(img: &Image<f32>) -> TreeNode {
         create_node(img, Point { x: 0, y: 0 }, img.width, img.height)
     }
 
-    pub fn under_threshold(&self, threshold: i32) -> Vec<Point<u32>> {
+    pub fn under_threshold(&self, threshold: f32) -> Vec<Point<u32>> {
         if self.lower_bound > threshold {
             return Vec::new();
         }
@@ -48,7 +47,7 @@ impl TreeNode {
         cells
     }
 
-    pub fn above_threshold(&self, threshold: i32) -> Vec<Point<u32>> {
+    pub fn above_threshold(&self, threshold: f32) -> Vec<Point<u32>> {
         if self.upper_bound < threshold {
             return Vec::new();
         }
@@ -78,12 +77,12 @@ impl TreeNode {
     }
 }
 
-fn create_node(img: &Image, origin: Point<u32>, width: u32, height: u32) -> TreeNode {
-    let mut min = i32::MAX;
-    let mut max = i32::MIN;
+fn create_node(img: &Image<f32>, origin: Point<u32>, width: u32, height: u32) -> TreeNode {
+    let mut min = f32::MAX;
+    let mut max = f32::MIN;
 
     if width <= 2 && height <= 2 {
-        let mut values: Vec<i32> = Vec::new();
+        let mut values: Vec<f32> = Vec::new();
         let offsets: [(u32, u32); 4] = [(0, 0), (0, 1), (1, 0), (1, 1)];
 
         for (x, y) in &offsets {
@@ -92,10 +91,12 @@ fn create_node(img: &Image, origin: Point<u32>, width: u32, height: u32) -> Tree
             img.get_val(&point).map(|val| values.push(val));
         }
 
+        values.sort_by(|a, b| a.partial_cmp(b).unwrap());
+
         return TreeNode {
             origin: origin,
-            lower_bound: *values.iter().min().unwrap_or(&i32::MAX),
-            upper_bound: *values.iter().max().unwrap_or(&i32::MIN),
+            lower_bound: *values.first().unwrap_or(&f32::MAX),
+            upper_bound: *values.last().unwrap_or(&f32::MIN),
             width: width,
             height: height,
             top_left: None,
@@ -119,8 +120,18 @@ fn create_node(img: &Image, origin: Point<u32>, width: u32, height: u32) -> Tree
     let bottom_height = height + 1 - next_height;
 
     let top_left_tree = create_node(img, origin.clone(), next_width, next_height);
-    min = cmp::min(min, top_left_tree.lower_bound);
-    max = cmp::max(max, top_left_tree.upper_bound);
+
+    min = if min < top_left_tree.lower_bound {
+        min
+    } else {
+        top_left_tree.lower_bound
+    };
+    max = if max > top_left_tree.upper_bound {
+        max
+    } else {
+        top_left_tree.upper_bound
+    };
+
     let top_left = Some(Box::new(top_left_tree));
 
     if width > 2 {
@@ -213,14 +224,14 @@ mod tests {
     #[test]
     #[rustfmt::skip]
     fn test_create_uneven_quadtree() {
-        let data: [i32; 9] = [1,2,3,
-                              4,5,6,
-                              7,8,9];
+        let data = [1,2,3,
+                    4,5,6,
+                    7,8,9].iter().map(|num| *num as f32).collect::<Vec<f32>>();
         let img = Image::new(&data, 3, 3);
         let tree = create_node(&img, Point {x: 0, y: 0}, 3, 3);
 
-        assert_eq!(tree.lower_bound, 1);
-        assert_eq!(tree.upper_bound, 9);
+        assert_eq!(tree.lower_bound, 1.0);
+        assert_eq!(tree.upper_bound, 9.0);
 
         let top_left = tree.top_left.unwrap();
         let top_right = tree.top_right.unwrap();
@@ -237,15 +248,15 @@ mod tests {
         assert_eq!(bottom_left.height, 2);
         assert_eq!(bottom_right.height, 2);
 
-        assert_eq!(top_left.upper_bound, 5);
-        assert_eq!(top_right.upper_bound, 6);
-        assert_eq!(bottom_left.upper_bound, 8);
-        assert_eq!(bottom_right.upper_bound, 9);
+        assert_eq!(top_left.upper_bound, 5.0);
+        assert_eq!(top_right.upper_bound, 6.0);
+        assert_eq!(bottom_left.upper_bound, 8.0);
+        assert_eq!(bottom_right.upper_bound, 9.0);
 
-        assert_eq!(top_left.lower_bound, 1);
-        assert_eq!(top_right.lower_bound, 2);
-        assert_eq!(bottom_left.lower_bound, 4);
-        assert_eq!(bottom_right.lower_bound, 5);
+        assert_eq!(top_left.lower_bound, 1.0);
+        assert_eq!(top_right.lower_bound, 2.0);
+        assert_eq!(bottom_left.lower_bound, 4.0);
+        assert_eq!(bottom_right.lower_bound, 5.0);
     }
 
     #[test]
@@ -254,12 +265,12 @@ mod tests {
         let data = [1,1,1,1,2,2,2,2, 
                     1,1,1,1,2,2,2,2, 
                     3,3,3,3,4,4,4,4, 
-                    3,3,3,3,4,4,4,4];
+                    3,3,3,3,4,4,4,4].iter().map(|num| *num as f32).collect::<Vec<f32>>();
         let img = Image::new(&data, 8, 4);
         let tree = create_node(&img, Point {x: 0, y: 0}, 8, 4);
 
-        assert_eq!(tree.lower_bound, 1);
-        assert_eq!(tree.upper_bound, 4);
+        assert_eq!(tree.lower_bound, 1.0);
+        assert_eq!(tree.upper_bound, 4.0);
 
         let top_left = tree.top_left.unwrap();
         let top_right = tree.top_right.unwrap();
@@ -276,15 +287,15 @@ mod tests {
         assert_eq!(bottom_left.height, 3);
         assert_eq!(bottom_right.height, 3);
 
-        assert_eq!(top_left.upper_bound, 1);
-        assert_eq!(top_right.upper_bound, 2);
-        assert_eq!(bottom_left.upper_bound, 3);
-        assert_eq!(bottom_right.upper_bound, 4);
+        assert_eq!(top_left.upper_bound, 1.0);
+        assert_eq!(top_right.upper_bound, 2.0);
+        assert_eq!(bottom_left.upper_bound, 3.0);
+        assert_eq!(bottom_right.upper_bound, 4.0);
 
-        assert_eq!(top_left.lower_bound, 1);
-        assert_eq!(top_right.lower_bound, 1);
-        assert_eq!(bottom_left.lower_bound, 1);
-        assert_eq!(bottom_right.lower_bound, 1);
+        assert_eq!(top_left.lower_bound, 1.0);
+        assert_eq!(top_right.lower_bound, 1.0);
+        assert_eq!(bottom_left.lower_bound, 1.0);
+        assert_eq!(bottom_right.lower_bound, 1.0);
     }
 
     #[test]
@@ -294,14 +305,14 @@ mod tests {
         let data = [1,2,5,6,2,2,2,2, 
                     3,4,7,8,2,2,2,2, 
                     3,3,3,3,4,4,4,4, 
-                    3,3,3,3,4,4,4,4];
+                    3,3,3,3,4,4,4,4].iter().map(|num| *num as f32).collect::<Vec<f32>>();
         let img = Image::new(&data, 8, 4);
         let tree = create_node(&img, Point {x: 0, y: 0}, 8, 4);
 
-        let cells = tree.under_threshold(2);
+        let cells = tree.under_threshold(2.0);
         assert_eq!(cells.len(), 10);
 
-        let cells = tree.under_threshold(3);
+        let cells = tree.under_threshold(3.0);
 
         assert_eq!(cells.len(), 17);
 
@@ -314,10 +325,10 @@ mod tests {
                     3, 4, 5, 6, 6, 5, 4, 3,
                     2, 3, 4, 5, 5, 4, 3, 2,
                     1, 2, 3, 4, 4, 3, 2, 1
-        ];
+        ].iter().map(|num| *num as f32).collect::<Vec<f32>>();
         let img = Image::new(&data, 8, 8);
         let tree = create_node(&img, Point {x: 0, y: 0}, img.width, img.height);
-        let cells = tree.under_threshold(7);
+        let cells = tree.under_threshold(7.0);
         println!("{:?}", cells);
     }
 
@@ -332,10 +343,10 @@ mod tests {
                     3, 4, 5, 6, 5, 4, 3,
                     2, 3, 4, 5, 4, 3, 2,
                     1, 2, 3, 4, 3, 2, 1
-        ];
+        ].iter().map(|num| *num as f32).collect::<Vec<f32>>();
         let img = Image::new(&data, 7, 7);
         let tree = create_node(&img, Point {x: 0, y: 0}, img.width, img.height);
-        let cells = tree.above_threshold(7);
+        let cells = tree.above_threshold(7.0);
 
         assert_eq!(cells, vec![
             Point {x: 2, y: 2}, 
@@ -351,10 +362,10 @@ mod tests {
                     3, 4, 5, 6, 6, 5, 4, 3,
                     2, 3, 4, 5, 5, 4, 3, 2,
                     1, 2, 3, 4, 4, 3, 2, 1
-        ];
+        ].iter().map(|num| *num as f32).collect::<Vec<f32>>();
         let img = Image::new(&data, 8, 8);
         let tree = create_node(&img, Point {x: 0, y: 0}, img.width, img.height);
-        let cells = tree.above_threshold(7);
+        let cells = tree.above_threshold(7.0);
 
         println!("{:?}", cells);
     }

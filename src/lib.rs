@@ -1,4 +1,3 @@
-use wasm_bindgen::prelude::*;
 mod marching_squares;
 mod quad_tree;
 mod util;
@@ -23,23 +22,23 @@ pub struct Svg {
 }
 
 #[cfg(target_arch = "wasm32")]
-#[wasm_bindgen]
-pub fn isoline(data: &[i32], width: u32, height: u32, thresholds: &[i32]) -> JsValue {
+#[wasm_bindgen::prelude::wasm_bindgen]
+pub fn isoline(data: &[f32], width: u32, height: u32, thresholds: &[f32]) -> JsValue {
     console_error_panic_hook::set_once();
     let svg = isoline_to_svg(data, width, height, thresholds);
     JsValue::from_serde(&svg).unwrap()
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-pub fn isoline(data: &[i32], width: u32, height: u32, thresholds: &[i32]) -> Svg {
+pub fn isoline(data: &[f32], width: u32, height: u32, thresholds: &[f32]) -> Svg {
     isoline_to_svg(data, width, height, thresholds)
 }
 
-fn isoline_to_svg(data: &[i32], width: u32, height: u32, thresholds: &[i32]) -> Svg {
+fn isoline_to_svg(data: &[f32], width: u32, height: u32, thresholds: &[f32]) -> Svg {
     let image = util::Image::new(data, width, height);
     let marching_squares = MarchingSquares::new(&image);
 
-    let threshold_to_path = |threshold: &i32| {
+    let threshold_to_path = |threshold: &f32| {
         let isoline = marching_squares.isoline(*threshold);
         let path: String = isoline
             .paths
@@ -121,17 +120,17 @@ mod tests {
             3, 4, 5, 6, 6, 5, 4, 3, 3, 4, 5, 6, 6, 5, 4, 3, 
             2, 3, 4, 5, 5, 4, 3, 2, 2, 3, 4, 5, 5, 4, 3, 2, 
             1, 2, 3, 4, 4, 3, 2, 1, 1, 2, 3, 4, 4, 3, 2, 1,
-        ];
+        ].iter().map(|num| *num as f32).collect::<Vec<f32>>();
 
 
-        println!("{}", isoline(&data, 16, 16, &vec![7]));
-        println!("{}", isoline(&data, 16, 16, &vec![5]));
-        println!("{}", isoline(&data, 16, 16, &vec![3]));
-        println!("{}", isoline(&data, 16, 16, &vec![3,5,7]));
+        println!("{}", isoline(&data, 16, 16, &vec![7.0]));
+        println!("{}", isoline(&data, 16, 16, &vec![5.0]));
+        println!("{}", isoline(&data, 16, 16, &vec![3.0]));
+        println!("{}", isoline(&data, 16, 16, &vec![3.0,5.0,7.0]));
 
         let image = util::Image::new(&data, 16, 16);
         let marching_squares = MarchingSquares::new(&image);
-        let IsolineLayer{paths, threshold:_} = marching_squares.isoline(5);
+        let IsolineLayer{paths, threshold:_} = marching_squares.isoline(5.0);
 
         for path in paths {
             println!("{:?}", path);

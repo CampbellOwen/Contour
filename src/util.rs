@@ -110,14 +110,14 @@ impl Hash for Point<u32> {
 impl Eq for Point<u32> {}
 impl Eq for Point<f32> {}
 
-pub struct Image<'a> {
-    data: &'a [i32],
+pub struct Image<'a, T> {
+    data: &'a [T],
     pub width: u32,
     pub height: u32,
 }
 
-impl Image<'_> {
-    pub fn new(data: &[i32], width: u32, height: u32) -> Image {
+impl<T: Clone> Image<'_, T> {
+    pub fn new(data: &[T], width: u32, height: u32) -> Image<T> {
         Image {
             data,
             width,
@@ -125,12 +125,12 @@ impl Image<'_> {
         }
     }
 
-    pub fn get_val(&self, pt: &Point<u32>) -> Option<i32> {
+    pub fn get_val(&self, pt: &Point<u32>) -> Option<T> {
         if pt.x >= self.width || pt.y >= self.height {
             return None;
         }
 
-        Some(self.data[point_to_index(pt, self.width)])
+        Some(self.data[point_to_index(pt, self.width)].clone())
     }
 }
 
