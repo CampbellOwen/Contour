@@ -4,9 +4,14 @@ mod util;
 
 use std::fmt;
 
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen::prelude::*;
+
 use serde::{Deserialize, Serialize};
 
 use marching_squares::{MarchingSquares, Path};
+use std::io::Cursor;
+use tiff::decoder::*;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SvgPath {
@@ -22,23 +27,56 @@ pub struct Svg {
 }
 
 #[cfg(target_arch = "wasm32")]
-#[wasm_bindgen::prelude::wasm_bindgen]
-pub fn isoline(data: &[f32], width: u32, height: u32, thresholds: &[f32]) -> JsValue {
+#[wasm_bindgen]
+pub fn isoline_from_tiff(data: &[u8], thresholds: &[f32]) -> JsValue {
     console_error_panic_hook::set_once();
-    let svg = isoline_to_svg(data, width, height, thresholds);
+    let image = bytes_to_image(data).unwrap();
+    let svg = isoline_to_svg(&image, thresholds).unwrap();
     JsValue::from_serde(&svg).unwrap()
 }
 
-#[cfg(not(target_arch = "wasm32"))]
-pub fn isoline(data: &[f32], width: u32, height: u32, thresholds: &[f32]) -> Svg {
-    isoline_to_svg(data, width, height, thresholds)
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen]
+pub fn isoline(data: Vec<f32>, width: u32, height: u32, thresholds: &[f32]) -> JsValue {
+    console_error_panic_hook::set_once();
+
+    let image = util::Image::new(data, width, height);
+    let svg = isoline_to_svg(&image, thresholds).unwrap();
+    JsValue::from_serde(&svg).unwrap()
 }
 
-fn isoline_to_svg(data: &[f32], width: u32, height: u32, thresholds: &[f32]) -> Svg {
-    let image = util::Image::new(data, width, height);
-    let marching_squares = MarchingSquares::new(&image);
+fn bytes_to_image(data: &[u8]) -> Result<util::Image<f32>, tiff::TiffError> {
+    let mut reader = Decoder::new(Cursor::new(data))?;
+    let read_result = &reader.read_image()?;
+    let (width, height) = &reader.dimensions()?;
+    let image_data: Vec<f32> = match read_result {
+        DecodingResult::U8(d) => d.iter().map(|x| *x as f32).collect(),
+        DecodingResult::U16(d) => d.iter().map(|x| *x as f32).collect(),
+        DecodingResult::U32(d) => d.iter().map(|x| *x as f32).collect(),
+        DecodingResult::U64(d) => d.iter().map(|x| *x as f32).collect(),
+        DecodingResult::F32(d) => d.clone(),
+        DecodingResult::F64(d) => d.iter().map(|x| *x as f32).collect(),
+    };
 
-    let threshold_to_path = |threshold: &f32| {
+    Ok(util::Image::new(image_data, *width, *height))
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub fn isoline_from_tiff(data: &[u8], thresholds: &[f32]) -> Svg {
+    let img = bytes_to_image(data).unwrap();
+    isoline_to_svg(&img, thresholds).unwrap()
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub fn isoline(data: Vec<f32>, width: u32, height: u32, thresholds: &[f32]) -> Svg {
+    let image = util::Image::new(data, width, height);
+    isoline_to_svg(&image, thresholds).unwrap()
+}
+
+fn isoline_to_svg(img: &util::Image<f32>, thresholds: &[f32]) -> Result<Svg, tiff::TiffError> {
+    let marching_squares = MarchingSquares::new(img);
+
+    let threshold_to_path = |(i, threshold): (usize, &f32)| {
         let isoline = marching_squares.isoline(*threshold);
         let path: String = isoline
             .paths
@@ -47,19 +85,20 @@ fn isoline_to_svg(data: &[f32], width: u32, height: u32, thresholds: &[f32]) -> 
             .collect::<Vec<String>>()
             .join(" ");
         SvgPath {
-            class: format!("threshold_{}_path", threshold),
+            class: format!("threshold_{}_path", i),
             fill: "none".to_string(),
             path: path,
         }
     };
 
-    Svg {
-        view_box: format!("0 0 {} {}", width, height),
+    Ok(Svg {
+        view_box: format!("0 0 {} {}", img.width, img.height),
         paths: thresholds
             .iter()
+            .enumerate()
             .map(threshold_to_path)
             .collect::<Vec<SvgPath>>(),
-    }
+    })
 }
 
 impl fmt::Display for Svg {
@@ -122,18 +161,34 @@ mod tests {
             1, 2, 3, 4, 4, 3, 2, 1, 1, 2, 3, 4, 4, 3, 2, 1,
         ].iter().map(|num| *num as f32).collect::<Vec<f32>>();
 
+        let image = util::Image::new(data, 16, 16);
 
-        println!("{}", isoline(&data, 16, 16, &vec![7.0]));
-        println!("{}", isoline(&data, 16, 16, &vec![5.0]));
-        println!("{}", isoline(&data, 16, 16, &vec![3.0]));
-        println!("{}", isoline(&data, 16, 16, &vec![3.0,5.0,7.0]));
 
-        let image = util::Image::new(&data, 16, 16);
+        println!("{}", isoline_to_svg(&image, &vec![7.0]).unwrap());
+        println!("{}", isoline_to_svg(&image, &vec![5.0]).unwrap());
+        println!("{}", isoline_to_svg(&image, &vec![3.0]).unwrap());
+        println!("{}", isoline_to_svg(&image, &vec![3.0,5.0,7.0]).unwrap());
+
         let marching_squares = MarchingSquares::new(&image);
         let IsolineLayer{paths, threshold:_} = marching_squares.isoline(5.0);
 
         for path in paths {
             println!("{:?}", path);
         }
+    }
+
+    use std::fs::File;
+    use std::io;
+    use std::io::prelude::*;
+
+    #[test]
+    fn test_tiff_isoline() {
+        let mut f: File = File::open("Seattle.tif").unwrap();
+        let mut buffer: Vec<u8> = Vec::new();
+
+        f.read_to_end(&mut buffer);
+
+        let svg: Svg = isoline_from_tiff(&buffer, &vec![25.0, 50.0, 75.0, 100.0]);
+        println!("{}", svg);
     }
 }

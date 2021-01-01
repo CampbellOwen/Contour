@@ -110,14 +110,14 @@ impl Hash for Point<u32> {
 impl Eq for Point<u32> {}
 impl Eq for Point<f32> {}
 
-pub struct Image<'a, T> {
-    data: &'a [T],
+pub struct Image<T> {
+    data: Vec<T>,
     pub width: u32,
     pub height: u32,
 }
 
-impl<T: Clone> Image<'_, T> {
-    pub fn new(data: &[T], width: u32, height: u32) -> Image<T> {
+impl<T: Clone> Image<T> {
+    pub fn new(data: Vec<T>, width: u32, height: u32) -> Image<T> {
         Image {
             data,
             width,

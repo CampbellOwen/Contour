@@ -227,7 +227,7 @@ mod tests {
         let data = [1,2,3,
                     4,5,6,
                     7,8,9].iter().map(|num| *num as f32).collect::<Vec<f32>>();
-        let img = Image::new(&data, 3, 3);
+        let img = Image::new(data, 3, 3);
         let tree = create_node(&img, Point {x: 0, y: 0}, 3, 3);
 
         assert_eq!(tree.lower_bound, 1.0);
@@ -266,7 +266,7 @@ mod tests {
                     1,1,1,1,2,2,2,2, 
                     3,3,3,3,4,4,4,4, 
                     3,3,3,3,4,4,4,4].iter().map(|num| *num as f32).collect::<Vec<f32>>();
-        let img = Image::new(&data, 8, 4);
+        let img = Image::new(data, 8, 4);
         let tree = create_node(&img, Point {x: 0, y: 0}, 8, 4);
 
         assert_eq!(tree.lower_bound, 1.0);
@@ -306,7 +306,7 @@ mod tests {
                     3,4,7,8,2,2,2,2, 
                     3,3,3,3,4,4,4,4, 
                     3,3,3,3,4,4,4,4].iter().map(|num| *num as f32).collect::<Vec<f32>>();
-        let img = Image::new(&data, 8, 4);
+        let img = Image::new(data, 8, 4);
         let tree = create_node(&img, Point {x: 0, y: 0}, 8, 4);
 
         let cells = tree.under_threshold(2.0);
@@ -326,7 +326,7 @@ mod tests {
                     2, 3, 4, 5, 5, 4, 3, 2,
                     1, 2, 3, 4, 4, 3, 2, 1
         ].iter().map(|num| *num as f32).collect::<Vec<f32>>();
-        let img = Image::new(&data, 8, 8);
+        let img = Image::new(data, 8, 8);
         let tree = create_node(&img, Point {x: 0, y: 0}, img.width, img.height);
         let cells = tree.under_threshold(7.0);
         println!("{:?}", cells);
@@ -344,7 +344,7 @@ mod tests {
                     2, 3, 4, 5, 4, 3, 2,
                     1, 2, 3, 4, 3, 2, 1
         ].iter().map(|num| *num as f32).collect::<Vec<f32>>();
-        let img = Image::new(&data, 7, 7);
+        let img = Image::new(data, 7, 7);
         let tree = create_node(&img, Point {x: 0, y: 0}, img.width, img.height);
         let cells = tree.above_threshold(7.0);
 
@@ -363,7 +363,7 @@ mod tests {
                     2, 3, 4, 5, 5, 4, 3, 2,
                     1, 2, 3, 4, 4, 3, 2, 1
         ].iter().map(|num| *num as f32).collect::<Vec<f32>>();
-        let img = Image::new(&data, 8, 8);
+        let img = Image::new(data, 8, 8);
         let tree = create_node(&img, Point {x: 0, y: 0}, img.width, img.height);
         let cells = tree.above_threshold(7.0);
 

@@ -47,12 +47,12 @@ const CELL_OFFSETS: [Point<u32>; 4] = [
 ];
 
 pub struct MarchingSquares<'a> {
-    img: &'a Image<'a, f32>,
+    img: &'a Image<f32>,
     quad_tree: TreeNode,
 }
 
 impl MarchingSquares<'_> {
-    pub fn new<'a>(img: &'a Image<'a, f32>) -> MarchingSquares<'a> {
+    pub fn new<'a>(img: &'a Image<f32>) -> MarchingSquares<'a> {
         let quad_tree = TreeNode::create(img);
         MarchingSquares {
             img: img,
@@ -513,7 +513,7 @@ mod tests {
             3, 3, 3, 3, 4, 4, 4, 4, 
             3, 3, 3, 3, 4, 4, 4, 4,
         ].iter().map(|num| *num as f32).collect::<Vec<f32>>();
-        let img = Image::<f32>::new(&data, 8, 4);
+        let img = Image::new(data, 8, 4);
         let marching_squares = MarchingSquares::new(&img);
 
         assert_eq!(
@@ -571,7 +571,7 @@ mod tests {
             3, 3, 3, 3, 4, 4, 4, 4, 
             3, 3, 3, 3, 4, 4, 4, 4,
         ].iter().map(|num| *num as f32).collect::<Vec<f32>>();
-        let img = Image::new(&data, 8, 4);
+        let img = Image::new(data, 8, 4);
         let marching_squares = MarchingSquares::new(&img);
 
         assert_eq!(
@@ -615,7 +615,7 @@ mod tests {
                     2, 3, 4, 5, 5, 4, 3, 2,
                     1, 2, 3, 4, 4, 3, 2, 1
         ].iter().map(|num| *num as f32).collect::<Vec<f32>>();
-        let img = Image::new(&data, 8, 8);
+        let img = Image::new(data, 8, 8);
         let marching_squares = MarchingSquares::new(&img);
 
         let segments = marching_squares.segments_for_threshold(7.0);
@@ -633,7 +633,7 @@ mod tests {
             6, 5, 4, 4, 5, 6, 8, 8, 6, 5, 4, 3, 4, 5, 6, 6, 5, 4, 3, 2, 3, 4, 5, 5, 4, 3, 2, 1, 2,
             3, 4, 4, 3, 2, 1,
         ].iter().map(|num| *num as f32).collect::<Vec<f32>>();
-        let img = Image::new(&data, 8, 8);
+        let img = Image::new(data, 8, 8);
         let marching_squares = MarchingSquares::new(&img);
 
         let segments = marching_squares.segments_for_threshold(7.0);
@@ -708,7 +708,7 @@ mod tests {
             2, 3, 4, 5, 5, 4, 3, 2, 
             1, 2, 3, 4, 4, 3, 2, 1,
         ].iter().map(|num| *num as f32).collect::<Vec<f32>>();
-        let img = Image::new(&data, 8, 8);
+        let img = Image::new(data, 8, 8);
         let marching_squares = MarchingSquares::new(&img);
 
         let segments = marching_squares.segments_for_threshold(7.0);
@@ -744,7 +744,7 @@ mod tests {
             2, 3, 4, 5, 5, 4, 3, 2, 
             1, 2, 3, 4, 4, 3, 2, 1,
         ].iter().map(|num| *num as f32).collect::<Vec<f32>>();
-        let img = Image::new(&data, 8, 8);
+        let img = Image::new(data, 8, 8);
         let marching_squares = MarchingSquares::new(&img);
 
         let segments = marching_squares.segments_for_threshold(7.0);
