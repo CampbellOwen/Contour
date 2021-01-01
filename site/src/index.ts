@@ -33,7 +33,7 @@ function isoline_to_svg(isoline: IsolineSVG): SVGSVGElement {
 import("contour").then((wasm) => {
   console.log("Contour loaded!");
   const isoline: IsolineSVG = wasm.isoline(
-    new Int32Array([
+    new Float32Array([
       1,
       2,
       3,
@@ -293,7 +293,7 @@ import("contour").then((wasm) => {
     ]),
     16,
     16,
-    new Int32Array([3, 4, 5, 6, 7])
+    new Float32Array([3, 4, 5, 6, 7])
   );
 
   const anchor = document.getElementById("svg");
