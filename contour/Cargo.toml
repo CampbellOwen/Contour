@@ -7,7 +7,7 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [lib]
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "lib"]
 
 [dependencies]
 wasm-bindgen = { version = "0.2.69", features = ["serde-serialize"] }
@@ -16,3 +16,4 @@ js-sys = "0.3.46"
 console_error_panic_hook = "0.1.6"
 serde = { version = "1.0.118", features = ["derive"] }
 tiff = "0.6.1"
+rayon = "1.5"

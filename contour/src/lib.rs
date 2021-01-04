@@ -13,6 +13,8 @@ use marching_squares::{MarchingSquares, Path};
 use std::io::Cursor;
 use tiff::decoder::*;
 
+use rayon::prelude::*;
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SvgPath {
     pub class: String,
@@ -94,7 +96,7 @@ fn isoline_to_svg(img: &util::Image<f32>, thresholds: &[f32]) -> Result<Svg, tif
     Ok(Svg {
         view_box: format!("0 0 {} {}", img.width, img.height),
         paths: thresholds
-            .iter()
+            .par_iter()
             .enumerate()
             .map(threshold_to_path)
             .collect::<Vec<SvgPath>>(),
@@ -178,15 +180,14 @@ mod tests {
     }
 
     use std::fs::File;
-    use std::io;
     use std::io::prelude::*;
 
     #[test]
     fn test_tiff_isoline() {
-        let mut f: File = File::open("Seattle.tif").unwrap();
+        let mut f: File = File::open("Seattle_Cropped.tif").unwrap();
         let mut buffer: Vec<u8> = Vec::new();
 
-        f.read_to_end(&mut buffer);
+        f.read_to_end(&mut buffer).unwrap();
 
         let svg: Svg = isoline_from_tiff(&buffer, &vec![25.0, 50.0, 75.0, 100.0]);
         println!("{}", svg);
