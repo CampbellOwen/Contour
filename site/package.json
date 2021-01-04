@@ -3,9 +3,13 @@
     "serve": "webpack serve --open"
   },
   "dependencies": {
-    "contour": "^0.4.0"
+    "contour": "^0.4.0",
+    "react": "^17.0.1",
+    "react-dom": "^17.0.1"
   },
   "devDependencies": {
+    "@types/react": "^17.0.0",
+    "@types/react-dom": "^17.0.0",
     "copy-webpack-plugin": "^7.0.0",
     "ts-loader": "^8.0.12",
     "typescript": "^4.1.3",
