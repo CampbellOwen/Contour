@@ -13,6 +13,7 @@ use marching_squares::{MarchingSquares, Path};
 use std::io::Cursor;
 use tiff::decoder::*;
 
+#[cfg(not(target_arch = "wasm32"))]
 use rayon::prelude::*;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -75,6 +76,7 @@ pub fn isoline(data: Vec<f32>, width: u32, height: u32, thresholds: &[f32]) -> S
     isoline_to_svg(&image, thresholds).unwrap()
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn isoline_to_svg(img: &util::Image<f32>, thresholds: &[f32]) -> Result<Svg, tiff::TiffError> {
     let marching_squares = MarchingSquares::new(img);
 
@@ -97,6 +99,35 @@ fn isoline_to_svg(img: &util::Image<f32>, thresholds: &[f32]) -> Result<Svg, tif
         view_box: format!("0 0 {} {}", img.width, img.height),
         paths: thresholds
             .par_iter()
+            .enumerate()
+            .map(threshold_to_path)
+            .collect::<Vec<SvgPath>>(),
+    })
+}
+
+#[cfg(target_arch = "wasm32")]
+fn isoline_to_svg(img: &util::Image<f32>, thresholds: &[f32]) -> Result<Svg, tiff::TiffError> {
+    let marching_squares = MarchingSquares::new(img);
+
+    let threshold_to_path = |(i, threshold): (usize, &f32)| {
+        let isoline = marching_squares.isoline(*threshold);
+        let path: String = isoline
+            .paths
+            .iter()
+            .map(|path| path_to_svg_path(path).join(" "))
+            .collect::<Vec<String>>()
+            .join(" ");
+        SvgPath {
+            class: format!("threshold_{}_path", i),
+            fill: "none".to_string(),
+            path: path,
+        }
+    };
+
+    Ok(Svg {
+        view_box: format!("0 0 {} {}", img.width, img.height),
+        paths: thresholds
+            .iter()
             .enumerate()
             .map(threshold_to_path)
             .collect::<Vec<SvgPath>>(),
